@@ -8,7 +8,9 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
-
+import boto3
+import json
+import decimal
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -41,21 +43,39 @@ def build_response(session_attributes, speechlet_response):
     }
 
 
+# Helper class to convert a DynamoDB item to JSON.
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            if o % 1 > 0:
+                return float(o)
+            else:
+                return int(o)
+        return super(DecimalEncoder, self).default(o)
 # --------------- Functions that control the skill's behavior ------------------
 
-def get_welcome_response():
-    """ If we wanted to initialize the session to have some attributes we could
-    add those here
-    """
+def get_names():
+    names = ""
 
+    dynamodb = boto3.resource('dynamodb', region_name='eu-west-1')
+    table = dynamodb.Table('WhoIsInTheHouse')
+
+    response = table.scan()
+
+    nameCount == len(response['Items'])
+    for idx, item in enumerate(response['Items']):
+        names += item['NameId']
+        if idx == nameCount - 2:
+            names += " and "
+        else if idx != nameCount - 1:
+            names += ", "
+
+    return names
+
+def get_welcome_response():
     session_attributes = {}
     card_title = "Welcome"
-    speech_output = "Liz and Phil are " \
-                    "here in the house. Happy new year!"
-    # If the user either does not reply to the welcome message or says something
-    # that is not understood, they will be prompted again with this text.
-    # reprompt_text = "Please tell me your favorite color by saying, " \
-    #                 "my favorite color is red."
+    speech_output = get_names() + " are here in the house."
     should_end_session = True
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, None, should_end_session))
