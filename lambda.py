@@ -8,6 +8,7 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
+from boto3.dynamodb.conditions import Key, Attr
 import boto3
 
 # --------------- Helpers that build all of the responses ----------------------
@@ -42,28 +43,40 @@ def build_response(session_attributes, speechlet_response):
 
 # --------------- Interacting with DynamoDB ------------------------------------
 dynamodb = boto3.resource('dynamodb', region_name='eu-west-1')
-table = dynamodb.Table('WhoIsInTheHouse')
+table = dynamodb.Table('WhoIsInTheHouses')
 
-def get_names():
+def get_names(userID):
     names = ""
 
-    response = table.scan()
+    response = table.query(
+        KeyConditionExpression=Key('UserID').eq(userID)
+    )
 
     nameCount = len(response['Items'])
     for idx, item in enumerate(response['Items']):
-        names += item['NameId']
+        names += item['Name']
         if idx == nameCount - 2:
             names += " and "
         elif idx != nameCount - 1:
             names += ", "
 
-    return names
+    return names, nameCount
 
-def add_name(name):
+def get_name_list(userID):
+    names, number = get_names(userID)
+    if number == 0:
+        return "There is no-one here in the house."
+    elif number == 1:
+        return names + " is the only person here in the house."
+    else:
+        return names + " are here in the house."
+
+def add_name(userID, name):
     try:
         response = table.put_item(
            Item={
-                'NameId': name
+                'UserID': userID,
+                'Name': name
             }
         ) 
     except ClientError as e:
@@ -72,11 +85,12 @@ def add_name(name):
         
     return None
 
-def delete_name(name):
+def delete_name(userID, name):
     try:
         response = table.delete_item(
            Key={
-                'NameId': name
+                'UserID': userID,
+                'Name': name
             }
         )    
     except ClientError as e:
@@ -87,10 +101,10 @@ def delete_name(name):
 
 # --------------- Functions that control the skill's behavior ------------------
 
-def get_help_response(): 
+def get_help_response(userID): 
     session_attributes = {}
     card_title = "Help"
-    speech_output = get_names() + " are here in the house. " + \ 
+    speech_output = get_name_list(userID) + \
         "You can tell me if someone has arrived or left and I'll keep the " + \
         "list up-to-date."
     should_end_session = False
@@ -99,19 +113,19 @@ def get_help_response():
         card_title, speech_output, reprompt_text, should_end_session))
     
     
-def get_welcome_response():
+def get_welcome_response(userID):
     session_attributes = {}
     card_title = "Welcome"
-    speech_output = get_names() + " are here in the house."
+    speech_output = get_name_list(userID)
     should_end_session = False
     reprompt_text = "Has anyone arrived or left?"
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
 
-def handle_session_end_request():
+def handle_session_end_request(userID):
     card_title = "Session Ended"
-    speech_output = get_names() +  " are here in the house."
+    speech_output = get_name_list(userID)
     should_end_session = True
     return build_response({}, build_speechlet_response(
         card_title, speech_output, None, should_end_session))
@@ -119,20 +133,20 @@ def handle_session_end_request():
 def create_favorite_color_attributes(favorite_color):
     return {"favoriteColor": favorite_color}
 
-def add_name_in_session(intent, session):
+def add_name_in_session(intent, session, userID):
     card_title = intent['name']
     session_attributes = {}
     speech_output = ""
     reprompt_text = ""
     if 'Name' in intent['slots']:
         name = intent['slots']['Name']['value']
-        error = add_name(name)
+        error = add_name(userID, name)
         if error is not None:
             speech_output = "Sorry, that didn't work. " + error
             reprompt_text = "Tell me the name of a person who arrived?"
             should_end_session = False
         else:
-            speech_output = "Now that " + name + " is here, " + get_names() + " are here in the house."
+            speech_output = "Now that " + name + " is here, " + get_name_list(userID)
             should_end_session = True
     else:
         reprompt_text = "Sorry, I didn't understand. Please try again."
@@ -141,7 +155,7 @@ def add_name_in_session(intent, session):
     return build_response({}, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
-def remove_name_in_session(intent, session):
+def remove_name_in_session(intent, session, userID):
     card_title = intent['name']
     session_attributes = {}
     speech_output = ""
@@ -149,13 +163,13 @@ def remove_name_in_session(intent, session):
 
     if 'Name' in intent['slots']:
         name = intent['slots']['Name']['value']
-        error = delete_name(name)
+        error = delete_name(userID, name)
         if error is not None:
             speech_output = "Sorry, that didn't work. " + error
             reprompt_text = "Tell me the name of a person who left the house?" 
             should_end_session = False
         else:
-            speech_output = "Now that " + name + " has gone, " + get_names() + " are here in the house."
+            speech_output = "Now that " + name + " has gone, " + get_name_list(userID)
             should_end_session = True
     else:
         reprompt_text = "Sorry, I didn't understand. Please try again."
@@ -202,8 +216,10 @@ def on_launch(launch_request, session):
 
     print("on_launch requestId=" + launch_request['requestId'] +
           ", sessionId=" + session['sessionId'])
+    userID = session['user']['userId']
+
     # Dispatch to your skill's launch
-    return get_welcome_response()
+    return get_welcome_response(userID)
 
 
 def on_intent(intent_request, session):
@@ -214,17 +230,18 @@ def on_intent(intent_request, session):
 
     intent = intent_request['intent']
     intent_name = intent_request['intent']['name']
+    userID = session['user']['userId']
 
     if intent_name == "WhoIsInTheHouse":
-        return get_welcome_response()
+        return get_welcome_response(userID)
     elif intent_name == "ArrivedInTheHouse":
-        return add_name_in_session(intent, session)
+        return add_name_in_session(intent, session, userID)
     elif intent_name == "LeftTheHouse":
-        return remove_name_in_session(intent, session)
+        return remove_name_in_session(intent, session, userID)
     elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
-        return handle_session_end_request()
+        return handle_session_end_request(userID)
     elif intent_name == "AMAZON.HelpIntent":
-        return get_welcome_response()
+        return get_welcome_response(userID)
     else:
          raise ValueError("Invalid intent")    
 

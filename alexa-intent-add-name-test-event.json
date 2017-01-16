@@ -4,7 +4,7 @@
     "sessionId": "amzn1.echo-api.session.[unique-value-here]",
     "attributes": {},
     "user": {
-      "userId": "amzn1.ask.account.[unique-value-here]"
+      "userId": "amzn1.ask.account.a-test-user-ID"
     },
     "application": {
       "applicationId": "amzn1.ask.skill.26c78df3-5551-4001-b71b-eb6fdd799ebc"
