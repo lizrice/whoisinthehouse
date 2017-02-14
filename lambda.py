@@ -21,8 +21,8 @@ def build_speechlet_response(title, output, reprompt_text, should_end_session):
         },
         'card': {
             'type': 'Simple',
-            'title': "SessionSpeechlet - " + title,
-            'content': "SessionSpeechlet - " + output
+            'title': title,
+            'content': output
         },
         'reprompt': {
             'outputSpeech': {
@@ -134,7 +134,7 @@ def create_favorite_color_attributes(favorite_color):
     return {"favoriteColor": favorite_color}
 
 def add_name_in_session(intent, session, userID):
-    card_title = intent['name']
+    card_title = "Someone arrived in the house"
     session_attributes = {}
     speech_output = ""
     reprompt_text = ""
@@ -156,7 +156,7 @@ def add_name_in_session(intent, session, userID):
         card_title, speech_output, reprompt_text, should_end_session))
 
 def remove_name_in_session(intent, session, userID):
-    card_title = intent['name']
+    card_title = "Someone left the house"
     session_attributes = {}
     speech_output = ""
     reprompt_text = ""
