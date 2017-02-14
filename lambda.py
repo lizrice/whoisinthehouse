@@ -149,7 +149,7 @@ def add_name_in_session(intent, session, userID):
             speech_output = "Now that " + name + " is here, " + get_name_list(userID)
             should_end_session = True
     else:
-        reprompt_text = "Sorry, I didn't understand. Please try again."
+        speech_output = "Sorry, I didn't understand. Please try again."
         should_end_session = False
     
     return build_response({}, build_speechlet_response(
@@ -172,7 +172,7 @@ def remove_name_in_session(intent, session, userID):
             speech_output = "Now that " + name + " has gone, " + get_name_list(userID)
             should_end_session = True
     else:
-        reprompt_text = "Sorry, I didn't understand. Please try again."
+        speech_output = "Sorry, I didn't understand. Please try again."
         should_end_session = False
     
     return build_response({}, build_speechlet_response(
