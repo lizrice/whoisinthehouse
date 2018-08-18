@@ -10,6 +10,7 @@ http://amzn.to/1LGWsLG
 from __future__ import print_function
 from boto3.dynamodb.conditions import Key, Attr
 import boto3
+from botocore.exceptions import ClientError
 
 # --------------- Helpers that build all of the responses ----------------------
 
